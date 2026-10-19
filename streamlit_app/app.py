@@ -36,6 +36,11 @@ st.write("Upload a short video (up to 3 minutes) and get it back with **Uzbek** 
 st.caption("Uzbek model: [islomov/rubaistt_v2_medium](https://huggingface.co/islomov/rubaistt_v2_medium) "
            "(Apache-2.0). Runs on a free CPU, so a 1-minute reel takes a few minutes.")
 
+# Keep video encoding light on the free server: max 1280 px tall, 2 encoder threads
+os.environ.setdefault("SUBTITLE_MAX_HEIGHT", "1280")
+os.environ.setdefault("FFMPEG_THREADS", "2")
+MAX_UPLOAD_MB = 30
+
 
 @st.cache_resource(show_spinner="Loading speech model (first time only)...")
 def get_model(name: str):
@@ -53,6 +58,12 @@ col1, col2 = st.columns(2)
 language_name = col1.radio("Language spoken in the video", list(LANGUAGES), index=1)
 max_words = col2.slider("Max words per caption", 1, 8, 4)
 styled = st.checkbox("Reels style (big bold centred text)", value=True)
+
+if video and video.size > MAX_UPLOAD_MB * 1024 * 1024:
+    st.error(f"This video is {video.size / 1024 / 1024:.0f} MB. The online demo accepts up to "
+             f"{MAX_UPLOAD_MB} MB (the free server has little memory). Please send a shorter "
+             "or smaller video, e.g. exported at 720p.")
+    st.stop()
 
 if video and st.button("Add subtitles", type="primary"):
     lock = job_lock()

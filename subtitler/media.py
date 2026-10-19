@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -60,12 +61,25 @@ def burn_subtitles(video: str | Path, subs: str | Path, output: str | Path) -> P
     video, subs, output = Path(video).resolve(), Path(subs).resolve(), Path(output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     flt = "ass" if subs.suffix.lower() == ".ass" else "subtitles"
+
+    # Optional limits for small servers (set as environment variables):
+    #   SUBTITLE_MAX_HEIGHT=1280 -> 4K/1080p phone videos are scaled down before encoding
+    #   FFMPEG_THREADS=2         -> fewer encoder threads = much less RAM
+    # Subtitle size/position stay correct: libass scales the .ass canvas to the frame.
+    filters = []
+    max_h = int(os.getenv("SUBTITLE_MAX_HEIGHT", "0") or 0)
+    if max_h:
+        filters.append(f"scale=-2:'min({max_h},ih)'")
+    filters.append(f"{flt}={subs.name}")
+    threads = os.getenv("FFMPEG_THREADS")
+
     # Run inside the subtitle's folder and pass only its file name: avoids ffmpeg
     # filter-path escaping problems (spaces, colons, Windows drive letters).
     _run([
         "ffmpeg", "-y", "-i", str(video),
-        "-vf", f"{flt}={subs.name}",
+        "-vf", ",".join(filters),
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+        *(["-threads", threads] if threads else []),
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         str(output),
