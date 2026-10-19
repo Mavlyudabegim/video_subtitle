@@ -45,8 +45,9 @@ def load_model(model: str = "small", device: str = "auto", compute_type: str = "
     int8 keeps memory low and runs well on CPU (free hosting tiers have no GPU).
     """
     from faster_whisper import WhisperModel
-
-    return WhisperModel(model, device=device, compute_type=compute_type)
+    # WHISPER_THREADS=2 on small servers: fewer threads = less memory
+    threads = int(os.getenv("WHISPER_THREADS", "0") or 0)
+    return WhisperModel(model, device=device, compute_type=compute_type, cpu_threads=threads)
 
 
 def transcribe(audio_path: str, model_size: str = "small", language: str | None = "en") -> list[Word]:
@@ -55,7 +56,8 @@ def transcribe(audio_path: str, model_size: str = "small", language: str | None 
         load_wav(audio_path),
         language=language,        # "en", "uz", or None = auto-detect
         word_timestamps=True,     # needed for short, well-timed captions
-        vad_filter=True,          # skip silence / music-only parts
+        vad_filter=True,
+        beam_size=int(os.getenv("WHISPER_BEAM", "5")),          # skip silence / music-only parts
     )
     words: list[Word] = []
     for seg in segments:  # generator: transcription actually runs here

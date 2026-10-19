@@ -22,13 +22,16 @@ try:
         os.environ["UZ_WHISPER_MODEL"] = st.secrets["UZ_WHISPER_MODEL"]
 except Exception:  # no secrets file locally
     pass
-# Free Streamlit server has little RAM -> default to the SMALL Uzbek model (whisper-base).
-# rubaistt-medium is better but needs ~2-3 GB RAM: use it locally, not on the free tier.
-os.environ.setdefault("UZ_WHISPER_MODEL", "Mavlyudabegim/navai-base-uzbek-ct2")
+
+# rubaistt-medium stored as int8 (half the size of float16) so it fits the free server
+os.environ.setdefault("UZ_WHISPER_MODEL", "Mavlyudabegim/rubaistt-medium-int8-ct2")
 print(f"[subtitler] Uzbek model: {os.environ['UZ_WHISPER_MODEL']}", flush=True)  # shows in the logs
 # Keep video encoding light on the free server: max 1280 px tall, 2 encoder threads
 os.environ.setdefault("SUBTITLE_MAX_HEIGHT", "1280")
 os.environ.setdefault("FFMPEG_THREADS", "2")
+# ...and light speech recognition: 2 threads, greedy decoding
+os.environ.setdefault("WHISPER_THREADS", "2")
+os.environ.setdefault("WHISPER_BEAM", "1")
 MAX_UPLOAD_MB = 30
 
 from subtitler import add_subtitles  # noqa: E402
@@ -40,10 +43,9 @@ OUT_DIR.mkdir(exist_ok=True)
 st.set_page_config(page_title="Video Subtitler", page_icon="🎬")
 st.title("Video Subtitler")
 st.write("Upload a short video (up to 3 minutes) and get it back with **Uzbek** or **English** subtitles.")
-st.caption("Online demo uses a small Uzbek model ([navai-uz/whisper-base-uzbek]"
-           "(https://huggingface.co/navai-uz/whisper-base-uzbek), Apache-2.0) because the free "
-           "server has little memory. Max 30 MB per video, one video at a time.")
-
+st.caption("Uzbek model: [islomov/rubaistt_v2_medium](https://huggingface.co/islomov/rubaistt_v2_medium) "
+           "(Apache-2.0). Free CPU server: max 30 MB per video, one video at a time, "
+           "a 1-minute reel takes a few minutes.")
 
 @st.cache_resource(show_spinner="Loading speech model (first time only)...")
 def get_model(name: str):
@@ -77,8 +79,7 @@ if video and st.button("Add subtitles", type="primary"):
         st.stop()
     try:
         language = LANGUAGES[language_name]
-        get_model(resolve_model("small", language))  # load once, shared by all visitors
-
+        get_model(resolve_model("base" if language == "en" else "small", language))  # load once, shared by all visitors
         job = uuid.uuid4().hex[:8]
         src = OUT_DIR / f"{job}_input{Path(video.name).suffix}"
         src.write_bytes(video.getbuffer())
@@ -86,7 +87,7 @@ if video and st.button("Add subtitles", type="primary"):
 
         with st.spinner("Transcribing and rendering... this can take a few minutes."):
             try:
-                res = add_subtitles(src, out, model_size="small", language=language,
+                res = add_subtitles(src, out, model_size="base", language=language,
                                     max_words=max_words, styled=styled)
             except ValueError as e:
                 st.error(str(e))

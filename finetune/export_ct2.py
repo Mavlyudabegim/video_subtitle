@@ -14,12 +14,14 @@ def main() -> None:
     ap.add_argument("--model", required=True, help="fine-tuned Transformers model folder or Hub id")
     ap.add_argument("--out", required=True)
     ap.add_argument("--upload", default=None, metavar="REPO_ID")
+    ap.add_argument("--quantization", default="float16",
+                    help="int8 = half the size and much less RAM on CPU servers")
     args = ap.parse_args()
 
     copy_files = [f for f in ["tokenizer.json", "preprocessor_config.json"]
                   if (Path(args.model) / f).exists()]
     cmd = ["ct2-transformers-converter", "--model", args.model, "--output_dir", args.out,
-           "--quantization", "float16", "--force"]
+           "--quantization", args.quantization, "--force"]
     if copy_files:
         cmd += ["--copy_files", *copy_files]
     subprocess.run(cmd, check=True)
