@@ -22,7 +22,14 @@ try:
         os.environ["UZ_WHISPER_MODEL"] = st.secrets["UZ_WHISPER_MODEL"]
 except Exception:  # no secrets file locally
     pass
-os.environ.setdefault("UZ_WHISPER_MODEL", "Mavlyudabegim/rubaistt-medium-ct2")
+# Free Streamlit server has little RAM -> default to the SMALL Uzbek model (whisper-base).
+# rubaistt-medium is better but needs ~2-3 GB RAM: use it locally, not on the free tier.
+os.environ.setdefault("UZ_WHISPER_MODEL", "Mavlyudabegim/navai-base-uzbek-ct2")
+print(f"[subtitler] Uzbek model: {os.environ['UZ_WHISPER_MODEL']}", flush=True)  # shows in the logs
+# Keep video encoding light on the free server: max 1280 px tall, 2 encoder threads
+os.environ.setdefault("SUBTITLE_MAX_HEIGHT", "1280")
+os.environ.setdefault("FFMPEG_THREADS", "2")
+MAX_UPLOAD_MB = 30
 
 from subtitler import add_subtitles  # noqa: E402
 from subtitler.transcribe import LANGUAGES, load_model, resolve_model  # noqa: E402
@@ -33,18 +40,15 @@ OUT_DIR.mkdir(exist_ok=True)
 st.set_page_config(page_title="Video Subtitler", page_icon="🎬")
 st.title("Video Subtitler")
 st.write("Upload a short video (up to 3 minutes) and get it back with **Uzbek** or **English** subtitles.")
-st.caption("Uzbek model: [islomov/rubaistt_v2_medium](https://huggingface.co/islomov/rubaistt_v2_medium) "
-           "(Apache-2.0). Runs on a free CPU, so a 1-minute reel takes a few minutes.")
-
-# Keep video encoding light on the free server: max 1280 px tall, 2 encoder threads
-os.environ.setdefault("SUBTITLE_MAX_HEIGHT", "1280")
-os.environ.setdefault("FFMPEG_THREADS", "2")
-MAX_UPLOAD_MB = 30
+st.caption("Online demo uses a small Uzbek model ([navai-uz/whisper-base-uzbek]"
+           "(https://huggingface.co/navai-uz/whisper-base-uzbek), Apache-2.0) because the free "
+           "server has little memory. Max 30 MB per video, one video at a time.")
 
 
 @st.cache_resource(show_spinner="Loading speech model (first time only)...")
 def get_model(name: str):
     return load_model(name)
+
 
 @st.cache_resource
 def job_lock() -> threading.Lock:
