@@ -1,0 +1,14 @@
+# keep the build upload small and private: only app code goes into the image
+data/
+models/
+runs/
+videos/
+finetune/
+tests/
+.venv/
+.git/
+__pycache__/
+*.mp4
+*.mov
+*.srt
+*.csv

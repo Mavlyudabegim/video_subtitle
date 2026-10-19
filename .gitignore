@@ -1,0 +1,15 @@
+data/
+models/
+runs/
+videos/
+eval_*.csv
+eval_results.csv
+*.mp4
+*.mov
+*.wav
+*.srt
+*.bin
+*.safetensors
+.venv/
+__pycache__/
+.DS_Store
