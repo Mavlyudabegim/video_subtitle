@@ -12,6 +12,23 @@ UZ_MODEL = os.getenv("UZ_WHISPER_MODEL", "")
 
 LANGUAGES = {"English": "en", "Uzbek": "uz"}
 
+import wave
+import numpy as np
+
+def load_wav(path: str) -> np.ndarray:
+    """Read the 16 kHz 16-bit WAV that media.extract_audio() writes, as float32 in [-1, 1].
+
+    We pass this array to faster-whisper instead of a file path, so faster-whisper does
+    not decode audio with PyAV (some PyAV versions break it: "unexpected keyword
+    argument 'metadata_errors'")."""
+    with wave.open(path, "rb") as w:
+        if w.getsampwidth() != 2:
+            raise ValueError("expected 16-bit PCM WAV")
+        data = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+        if w.getnchannels() > 1:
+            data = data.reshape(-1, w.getnchannels()).mean(axis=1)
+    return data.astype(np.float32) / 32768.0
+
 
 def resolve_model(model_size: str, language: str | None) -> str:
     """Pick the fine-tuned model for Uzbek, the stock Whisper model otherwise."""
@@ -35,7 +52,7 @@ def load_model(model: str = "small", device: str = "auto", compute_type: str = "
 def transcribe(audio_path: str, model_size: str = "small", language: str | None = "en") -> list[Word]:
     model = load_model(resolve_model(model_size, language))
     segments, _info = model.transcribe(
-        audio_path,
+        load_wav(audio_path),
         language=language,        # "en", "uz", or None = auto-detect
         word_timestamps=True,     # needed for short, well-timed captions
         vad_filter=True,          # skip silence / music-only parts

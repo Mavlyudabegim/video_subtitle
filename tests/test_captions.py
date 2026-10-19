@@ -26,3 +26,14 @@ def test_srt_and_ass_format(tmp_path):
     ass = write_ass(caps, tmp_path / "a.ass", 1080, 1920).read_text()
     assert "PlayResY: 1920" in ass
     assert "Dialogue: 0,0:01:01.50,0:01:02.00,Reels,,0,0,0,,THERE" in ass
+
+def test_load_wav_reads_ffmpeg_output(tmp_path):
+    import subprocess
+    from subtitler.media import extract_audio
+    from subtitler.transcribe import load_wav
+    src = tmp_path / "v.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=300:d=2",
+                    "-ac", "2", str(src)], check=True)
+    audio = load_wav(str(extract_audio(src, tmp_path / "a.wav")))
+    assert audio.dtype.name == "float32" and abs(len(audio) - 32000) < 400
+    assert 0 < abs(audio).max() <= 1.0
